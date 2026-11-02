@@ -11,5 +11,5 @@ export const projectSchema = z.object({
 
   descripton_pr: z.string().trim().min(30).max(6000),
 
-  price_pr: z.string().trim().min(1).max(100),
+  price_pr: z.string().trim().max(100).optional().default(""),
 });

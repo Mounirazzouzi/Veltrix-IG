@@ -81,7 +81,7 @@ ${process.env.PORTFOLIO_URL}
 
     attachments: [
       {
-        filename: "ProjectMind-AI-Report.pdf",
+        filename: "AzzouzipReport.pdf",
         content: pdfBuffer,
         contentType: "application/pdf",
       },
