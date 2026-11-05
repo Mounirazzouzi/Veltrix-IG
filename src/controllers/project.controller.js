@@ -14,10 +14,26 @@ import {
 } from "../services/mockapi.service.js";
 
 // =====================================================
+// PROJECT TYPES WITHOUT PDF OR EMAIL
+// =====================================================
+
+const DASHBOARD_ONLY_TYPES = [
+  "Website Redesign",
+  "Maintenance & Support",
+];
+
+const isDashboardOnlyProject = (projectType) =>
+  DASHBOARD_ONLY_TYPES.includes(projectType);
+
+// =====================================================
 // BACKGROUND PROCESSING
 // =====================================================
 
 const processProjectReport = async (project, savedProject) => {
+  const dashboardOnly = isDashboardOnlyProject(
+    project.subject_project
+  );
+
   try {
     // 1. AI analysis
     console.log(`[PROJECT ${savedProject.id}] Starting AI analysis...`);
@@ -35,7 +51,16 @@ const processProjectReport = async (project, savedProject) => {
 
     console.log(`[PROJECT ${savedProject.id}] Analysis saved.`);
 
-    // 3. Generate PDF Buffer
+    // 3. Special projects: dashboard only
+    if (dashboardOnly) {
+      console.log(
+        `[PROJECT ${savedProject.id}] Dashboard-only project. PDF and email skipped.`
+      );
+
+      return;
+    }
+
+    // 4. Generate PDF for other project types
     console.log(`[PROJECT ${savedProject.id}] Generating PDF...`);
 
     const pdfBuffer = await generateProjectPDF(project, analysis);
@@ -48,7 +73,7 @@ const processProjectReport = async (project, savedProject) => {
       `[PROJECT ${savedProject.id}] PDF generated: ${pdfBuffer.length} bytes.`
     );
 
-    // 4. Send PDF by email
+    // 5. Send PDF by email
     await sendProjectReport(
       project,
       pdfBuffer,
@@ -57,7 +82,7 @@ const processProjectReport = async (project, savedProject) => {
 
     console.log(`[PROJECT ${savedProject.id}] Email sent successfully.`);
 
-    // 5. Update email status
+    // 6. Update email status
     await updateEmailStatus(savedProject.id, true);
 
     console.log(
@@ -70,18 +95,20 @@ const processProjectReport = async (project, savedProject) => {
       error?.stack || error
     );
 
-    // Mark email as failed
-    try {
-      await updateEmailStatus(savedProject.id, false);
+    // Only mark email as failed when an email was expected
+    if (!dashboardOnly) {
+      try {
+        await updateEmailStatus(savedProject.id, false);
 
-      console.log(
-        `[PROJECT ${savedProject.id}] Email status updated to false.`
-      );
-    } catch (updateError) {
-      console.error(
-        `[PROJECT ${savedProject.id}] Failed to update email status:`,
-        updateError
-      );
+        console.log(
+          `[PROJECT ${savedProject.id}] Email status updated to false.`
+        );
+      } catch (updateError) {
+        console.error(
+          `[PROJECT ${savedProject.id}] Failed to update email status:`,
+          updateError
+        );
+      }
     }
   }
 };
@@ -137,12 +164,19 @@ export const analyzeAndSendProject = async (req, res) => {
     waitUntil(backgroundTask);
 
     // 4. Return immediate response
+    const dashboardOnly = isDashboardOnlyProject(
+      project.subject_project
+    );
+
     return res.status(201).json({
       success: true,
       message: "Your project request has been received successfully.",
       data: {
         id: savedProject.id,
         status: "received",
+        processing: dashboardOnly
+          ? "dashboard_only"
+          : "pdf_and_email",
       },
     });
 
